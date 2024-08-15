@@ -8,9 +8,9 @@ public class MyConfig extends AbstractComponentConfig implements Config {
 
 	protected static class Builder {
 		private String id = null;
-		private boolean readOnly;
-		private String modbusId = null;
-		private int modbusUnitId;
+		private String email;
+		private String password;
+		private String plantId;
 
 		private Builder() {
 		}
@@ -20,18 +20,18 @@ public class MyConfig extends AbstractComponentConfig implements Config {
 			return this;
 		}
 
-		public Builder setReadOnly(boolean readOnly) {
-			this.readOnly = readOnly;
+		public Builder setEmail(String email) {
+			this.email = email;
 			return this;
 		}
 
-		public Builder setModbusId(String modbusId) {
-			this.modbusId = modbusId;
+		public Builder setPassword(String password) {
+			this.password = password;
 			return this;
 		}
 
-		public Builder setModbusUnitId(int modbusUnitId) {
-			this.modbusUnitId = modbusUnitId;
+		public Builder setPlantId(String plantId) {
+			this.plantId = plantId;
 			return this;
 		}
 
@@ -57,23 +57,19 @@ public class MyConfig extends AbstractComponentConfig implements Config {
 	}
 
 	@Override
-	public boolean readOnly() {
-		return this.builder.readOnly;
+	public String email() {
+		return this.builder.email;
 	}
 
 	@Override
-	public String modbus_id() {
-		return this.builder.modbusId;
+	public String password() {
+		return this.builder.password;
 	}
 
 	@Override
-	public String Modbus_target() {
-		return ConfigUtils.generateReferenceTargetFilter(this.id(), this.modbus_id());
+	public String plantId() {
+		return this.builder.plantId;
 	}
 
-	@Override
-	public int modbusUnitId() {
-		return this.builder.modbusUnitId;
-	}
 
 }

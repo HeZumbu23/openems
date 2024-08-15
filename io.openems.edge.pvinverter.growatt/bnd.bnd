@@ -11,7 +11,10 @@ Bundle-Version: 1.0.0.${tstamp}
 	io.openems.edge.meter.api,\
 	io.openems.edge.pvinverter.api,\
 	io.openems.edge.pvinverter.sunspec,\
-
+	jooq,\
+	jooq,\
+	jooq,\
+	jooq
 -testpath: \
 	${testpath},\
 	com.ghgande.j2mod

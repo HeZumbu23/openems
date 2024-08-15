@@ -1,6 +1,8 @@
 package io.openems.edge.pvinverter.growatt;
 
-import java.util.Map;
+import java.io.IOException;
+import java.net.CookieManager;
+import java.net.http.HttpClient;
 
 import org.osgi.service.cm.ConfigurationAdmin;
 import org.osgi.service.component.ComponentContext;
@@ -9,32 +11,25 @@ import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.ConfigurationPolicy;
 import org.osgi.service.component.annotations.Deactivate;
 import org.osgi.service.component.annotations.Reference;
-import org.osgi.service.component.annotations.ReferenceCardinality;
-import org.osgi.service.component.annotations.ReferencePolicy;
-import org.osgi.service.component.annotations.ReferencePolicyOption;
 import org.osgi.service.event.Event;
 import org.osgi.service.event.EventHandler;
 import org.osgi.service.event.propertytypes.EventTopics;
 import org.osgi.service.metatype.annotations.Designate;
 
-import com.google.common.collect.ImmutableMap;
+import com.google.gson.JsonObject;
 
 import io.openems.common.channel.AccessMode;
 import io.openems.common.exceptions.OpenemsException;
-import io.openems.edge.bridge.modbus.api.BridgeModbus;
-import io.openems.edge.bridge.modbus.api.ModbusComponent;
-import io.openems.edge.bridge.modbus.sunspec.DefaultSunSpecModel;
-import io.openems.edge.bridge.modbus.sunspec.SunSpecModel;
+import io.openems.edge.common.component.AbstractOpenemsComponent;
 import io.openems.edge.common.component.OpenemsComponent;
 import io.openems.edge.common.event.EdgeEventConstants;
-import io.openems.edge.common.modbusslave.ModbusSlave;
 import io.openems.edge.common.modbusslave.ModbusSlaveTable;
-import io.openems.edge.common.taskmanager.Priority;
 import io.openems.edge.meter.api.ElectricityMeter;
+import io.openems.edge.meter.api.MeterType;
 import io.openems.edge.pvinverter.api.ManagedSymmetricPvInverter;
-import io.openems.edge.pvinverter.sunspec.AbstractSunSpecPvInverter;
-import io.openems.edge.pvinverter.sunspec.Phase;
-import io.openems.edge.pvinverter.sunspec.SunSpecPvInverter;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Designate(ocd = Config.class, factory = true)
 @Component(//
@@ -45,52 +40,52 @@ import io.openems.edge.pvinverter.sunspec.SunSpecPvInverter;
 				"type=PRODUCTION" //
 		})
 @EventTopics({ //
-		EdgeEventConstants.TOPIC_CYCLE_EXECUTE_WRITE, //
+		EdgeEventConstants.TOPIC_CYCLE_BEFORE_PROCESS_IMAGE
 })
-public class PvInverterGrowattImpl extends AbstractSunSpecPvInverter implements PvInverterGrowatt, SunSpecPvInverter,
-		ManagedSymmetricPvInverter, ElectricityMeter, ModbusComponent, OpenemsComponent, EventHandler, ModbusSlave {
+public class PvInverterGrowattImpl extends AbstractOpenemsComponent implements PvInverterGrowatt, ManagedSymmetricPvInverter, 
+		ElectricityMeter, OpenemsComponent, EventHandler {
 
-	private static final Map<SunSpecModel, Priority> ACTIVE_MODELS = ImmutableMap.<SunSpecModel, Priority>builder()
-			.put(DefaultSunSpecModel.S_1, Priority.LOW) // from 40003
-			.put(DefaultSunSpecModel.S_103, Priority.HIGH) // from 40071
-			.put(DefaultSunSpecModel.S_120, Priority.LOW) // from 40185
-			.build();
-
-	// Further available SunSpec blocks provided by Growatt are:
-	// .put(DefaultSunSpecModel.S_123, Priority.LOW) // from 40213 Read errors
-	// .put(DefaultSunSpecModel.S_113, Priority.HIGH) // from 40123
-	// .put(DefaultSunSpecModel.S_160, Priority.LOW) // from 40239
-	// .put(DefaultSunSpecModel.S_802, Priority.LOW) // from 40309
-
-	private static final int READ_FROM_MODBUS_BLOCK = 1;
+	private final Logger log = LoggerFactory.getLogger(PvInverterGrowattImpl.class);
 
 	@Reference
 	private ConfigurationAdmin cm;
-
-	@Override
-	@Reference(policy = ReferencePolicy.STATIC, policyOption = ReferencePolicyOption.GREEDY, cardinality = ReferenceCardinality.MANDATORY)
-	protected void setModbus(BridgeModbus modbus) {
-		super.setModbus(modbus);
-	}
-
+	
+	private GrowattApi api;
+	private HttpClient client;
+	private Boolean initialized = false;
+	private String plantId = "";
+	
 	public PvInverterGrowattImpl() {
-		super(//
-				ACTIVE_MODELS, //
-				OpenemsComponent.ChannelId.values(), //
-				ModbusComponent.ChannelId.values(), //
+		super(
+				OpenemsComponent.ChannelId.values(), //				
 				ElectricityMeter.ChannelId.values(), //
-				ManagedSymmetricPvInverter.ChannelId.values(), //
-				SunSpecPvInverter.ChannelId.values(), //
+				ManagedSymmetricPvInverter.ChannelId.values(), //				
 				PvInverterGrowatt.ChannelId.values() //
 		);
 	}
 
 	@Activate
-	private void activate(ComponentContext context, Config config) throws OpenemsException {
-		if (super.activate(context, config.id(), config.alias(), config.enabled(), config.readOnly(),
-				config.modbusUnitId(), this.cm, "Modbus", config.modbus_id(), READ_FROM_MODBUS_BLOCK, Phase.ALL)) {
-			return;
-		}
+	private void activate(ComponentContext context, Config config) throws OpenemsException, IOException, InterruptedException {
+		super.activate(context, config.id(), config.alias(), config.enabled());
+				
+		this.plantId = config.plantId();
+		
+        this.client = HttpClient.newBuilder()
+                .cookieHandler(new CookieManager())
+                .version(HttpClient.Version.HTTP_2)
+                .build();
+        
+        try {
+	        this.api = new GrowattApi(this.client);
+	        initialized = this.api.login(config.email(), config.password());
+	        if(initialized) {
+	        	log.debug("Sucessfully logged in into Growatt Cloud API");	        	 
+	        }
+        }
+		catch( IOException ex) {
+			this.channel(PvInverterGrowatt.ChannelId.GROWATT_API_FAILED).setNextValue(true);
+			this.logError(log,  "PvInverterGrowatt failen when logging in into Growatt Cloud API. Errormessage: " + ex.getMessage());
+		}		
 	}
 
 	@Override
@@ -101,7 +96,44 @@ public class PvInverterGrowattImpl extends AbstractSunSpecPvInverter implements 
 
 	@Override
 	public void handleEvent(Event event) {
-		super.handleEvent(event);
+		
+		if (!this.isEnabled() || !initialized) {
+			return;
+		}
+		
+		switch (event.getTopic()) {
+		case EdgeEventConstants.TOPIC_CYCLE_BEFORE_PROCESS_IMAGE:
+		
+			double power = -1;
+			try {
+				power = this.api.getPowerOfPlant(this.plantId);
+	        }
+			catch( Exception ex) {
+				this.channel(PvInverterGrowatt.ChannelId.GROWATT_API_FAILED).setNextValue(true);
+				break;
+			}	
+			int roundedPower = (int) Math.round(power);
+			this._setActivePower(roundedPower);
+			this.channel(ElectricityMeter.ChannelId.ACTIVE_PRODUCTION_ENERGY).setNextValue(roundedPower);
+			this.channel(ElectricityMeter.ChannelId.ACTIVE_CONSUMPTION_ENERGY).setNextValue(10);
+			break;		
+		}
+	}
+
+	@Override
+	public MeterType getMeterType() {
+		return MeterType.PRODUCTION;
+	}
+	
+	@Override
+	public String debugLog() {
+		return this.getActivePower().asString();
+	}
+	
+	@Override
+	public void retryModbusCommunication() {
+		// TODO Auto-generated method stub
+		
 	}
 
 	@Override
