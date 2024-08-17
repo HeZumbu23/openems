@@ -1,0 +1,37 @@
+# Starter pipeline
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+
+trigger:
+- integration/meter-tibber-inverter-growatt
+- feature/meter-tibber
+- feature/inverter-growatt
+
+pool:
+  vmImage: ubuntu-latest
+
+steps:
+- task: Docker@2
+  displayName: "Build and publish OpenEMS EDGE"
+  inputs:
+    containerRegistry: 'Dockerhub'
+    repository: 'mcmdoc120/openems-edge'
+    command: 'buildAndPush'
+    Dockerfile: 'tools/docker/edge/Dockerfile'
+    buildContext: '.'
+    tags: |
+      $(Build.SourceBranchName)-$(Build.BuildId)
+      $(Build.SourceBranchName)-latest
+
+- task: Docker@2
+  displayName: "Build and publish OpenEMS UI"
+  inputs:    
+    containerRegistry: 'Dockerhub'
+    repository: 'mcmdoc120/openems-ui'
+    command: 'buildAndPush'
+    Dockerfile: 'tools/docker/ui/Dockerfile'
+    buildContext: '.'
+    tags: |
+      $(Build.SourceBranchName)-$(Build.BuildId)
+      $(Build.SourceBranchName)-latest
