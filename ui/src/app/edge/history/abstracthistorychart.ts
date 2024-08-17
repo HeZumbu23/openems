@@ -2,6 +2,7 @@
 import { TranslateService } from '@ngx-translate/core';
 import * as Chart from 'chart.js';
 import { AbstractHistoryChart as NewAbstractHistoryChart } from 'src/app/shared/components/chart/abstracthistorychart';
+import { ChartConstants, XAxisType } from 'src/app/shared/components/chart/chart.constants';
 import { JsonrpcResponseError } from 'src/app/shared/jsonrpc/base';
 import { QueryHistoricTimeseriesDataRequest } from "src/app/shared/jsonrpc/request/queryHistoricTimeseriesDataRequest";
 import { QueryHistoricTimeseriesEnergyPerPeriodRequest } from 'src/app/shared/jsonrpc/request/queryHistoricTimeseriesEnergyPerPeriodRequest';
@@ -11,9 +12,7 @@ import { ChartAxis, HistoryUtils, Utils, YAxisTitle } from 'src/app/shared/servi
 import { ChannelAddress, Edge, EdgeConfig, Service } from 'src/app/shared/shared';
 import { DateUtils } from 'src/app/shared/utils/date/dateutils';
 import { DateTimeUtils } from 'src/app/shared/utils/datetime/datetime-utils';
-
 import { calculateResolution, ChronoUnit, DEFAULT_TIME_CHART_OPTIONS, EMPTY_DATASET, Resolution, setLabelVisible } from './shared';
-import { ChartConstants } from 'src/app/shared/components/chart/chart.constants';
 
 // NOTE: Auto-refresh of widgets is currently disabled to reduce server load
 export abstract class AbstractHistoryChart {
@@ -41,6 +40,8 @@ export abstract class AbstractHistoryChart {
     protected unit: YAxisTitle = YAxisTitle.ENERGY;
     /** @deprecated*/
     protected formatNumber: string = '1.0-2';
+    /** @deprecated*/
+    protected xAxisType: XAxisType = XAxisType.TIMESERIES;
 
     // Colors for Phase 1-3
     protected phase1Color = {
@@ -129,7 +130,8 @@ export abstract class AbstractHistoryChart {
             const colors = this.colors;
             const translate = this.translate;
             this.service.getConfig().then((conf) => {
-                options.datasets.line.borderWidth = 2;
+
+                options = NewAbstractHistoryChart.getDefaultOptions(this.xAxisType, this.service, this.labels);
 
                 /** Hide default displayed yAxis */
                 options.scales['y'] = {

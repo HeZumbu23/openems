@@ -1,7 +1,5 @@
 // @ts-strict-ignore
-
 import { TranslateService } from "@ngx-translate/core";
-
 import { CurrentData, EdgeConfig, GridMode, Utils } from "../../shared";
 import { TimeUtils } from "../../utils/time/timeutils";
 import { Formatter } from "./formatter";
@@ -36,6 +34,14 @@ export namespace Converter {
     }
     return "-"; // null or number
   };
+
+  export const IF_NUMBER_OR_STRING = (value: number | string | null, callback: (value: number | string) => string) => {
+    if (typeof value === 'number' || typeof value === 'string') {
+      return callback(value);
+    }
+    return "-"; // null or string
+  };
+
   /**
    * Converter for Grid-Buy-Power.
    *

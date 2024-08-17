@@ -502,6 +502,7 @@ export class EdgeConfig {
             case 'Kaco.BlueplanetHybrid10.PvInverter':
             case 'Kostal.Piko.Charger':
             case 'PV-Inverter.Fronius':
+            case 'PV-Inverter.Growatt':
             case 'PV-Inverter.KACO.blueplanet':
             case 'PV-Inverter.Kostal':
             case 'PV-Inverter.SMA.SunnyTripower':
