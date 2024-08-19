@@ -1,6 +1,7 @@
 package io.openems.edge.pvinverter.growatt;
 
 import org.osgi.service.metatype.annotations.AttributeDefinition;
+import org.osgi.service.metatype.annotations.AttributeType;
 import org.osgi.service.metatype.annotations.ObjectClassDefinition;
 
 @ObjectClassDefinition(//
@@ -20,7 +21,7 @@ import org.osgi.service.metatype.annotations.ObjectClassDefinition;
 	@AttributeDefinition(name = "Growatt Cloud API Email", description = "Your email address to log in into Growatt Cloud API")
 	String email() default "";
 
-	@AttributeDefinition(name = "Growatt Cloud API Password", description = "Your password to log in into Growatt Cloud API")
+	@AttributeDefinition(name = "Growatt Cloud API Password", description = "Your password to log in into Growatt Cloud API", type = AttributeType.PASSWORD)
 	String password() default "";
 
 	@AttributeDefinition(name = "Growatt plant ID", description = "The plantId of your plant. You can find it when logging in into Growatt Cloud")
