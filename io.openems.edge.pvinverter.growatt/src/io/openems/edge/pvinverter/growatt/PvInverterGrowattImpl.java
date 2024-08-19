@@ -3,6 +3,7 @@ package io.openems.edge.pvinverter.growatt;
 import java.io.IOException;
 import java.net.CookieManager;
 import java.net.http.HttpClient;
+import java.net.http.HttpResponse;
 
 import org.osgi.service.cm.ConfigurationAdmin;
 import org.osgi.service.component.ComponentContext;
@@ -46,15 +47,12 @@ public class PvInverterGrowattImpl extends AbstractOpenemsComponent implements P
 		ElectricityMeter, OpenemsComponent, EventHandler {
 
 	private final Logger log = LoggerFactory.getLogger(PvInverterGrowattImpl.class);
-
+	private Config config;
 	@Reference
 	private ConfigurationAdmin cm;
 	
 	private GrowattApi api;
-	private HttpClient client;
-	private Boolean initialized = false;
-	private String plantId = "";
-	
+		
 	public PvInverterGrowattImpl() {
 		super(
 				OpenemsComponent.ChannelId.values(), //				
@@ -67,26 +65,9 @@ public class PvInverterGrowattImpl extends AbstractOpenemsComponent implements P
 	@Activate
 	private void activate(ComponentContext context, Config config) throws OpenemsException, IOException, InterruptedException {
 		super.activate(context, config.id(), config.alias(), config.enabled());
-				
-		this.plantId = config.plantId();
-		
-        this.client = HttpClient.newBuilder()
-                .cookieHandler(new CookieManager())
-                .version(HttpClient.Version.HTTP_2)
-                .build();
-        
-        this.api = new GrowattApi(this.client);
-        
-        try {
-	        this.api.login(config.email(), config.password());
-	        initialized = true;
-        }
-		catch( GrowattApiException ex) {
-			initialized = false;
-			this.logError(log,  "PvInverterGrowatt failed when logging in into Growatt Cloud API. Errormessage: " + ex.getMessage());
-		}		
-        
-        this.channel(PvInverterGrowatt.ChannelId.GROWATT_API_FAILED).setNextValue(!initialized);
+					
+		this.config = config;
+		this.api = new GrowattApi(config.email(), config.password());        
 	}
 
 	@Override
@@ -98,7 +79,7 @@ public class PvInverterGrowattImpl extends AbstractOpenemsComponent implements P
 	@Override
 	public void handleEvent(Event event) {
 		
-		if (!this.isEnabled() || !initialized) {
+		if (!this.isEnabled()) {
 			return;
 		}
 		
@@ -107,23 +88,24 @@ public class PvInverterGrowattImpl extends AbstractOpenemsComponent implements P
 		
 			double power = -1;
 			try {
-				power = this.api.getPowerOfPlant(this.plantId);
+				power = this.api.getPowerOfPlant(config.plantId());
 				this.channel(PvInverterGrowatt.ChannelId.GROWATT_API_FAILED).setNextValue(false);
 	        }
 			catch(GrowattApiException ex) {
 				this.channel(PvInverterGrowatt.ChannelId.GROWATT_API_FAILED).setNextValue(true);
-				this.log.error("Could not get power for plant " + plantId + " from Growatt API", ex);				
+				this.log.error("Could not get power for plant " + config.plantId() + " from Growatt API", ex);				
 				return;		
 			}
 			catch(Exception ex) {
 				this.channel(PvInverterGrowatt.ChannelId.GROWATT_API_FAILED).setNextValue(true);
+				this.log.error("Unexpected exception when getting power for plant " + config.plantId() + " from Growatt API", ex);
 				throw ex;
 			}	
 			
 			int roundedPower = (int) Math.round(power);
 			this._setActivePower(roundedPower);
 			this.channel(ElectricityMeter.ChannelId.ACTIVE_PRODUCTION_ENERGY).setNextValue(roundedPower);
-			this.channel(ElectricityMeter.ChannelId.ACTIVE_CONSUMPTION_ENERGY).setNextValue(10);
+			this.channel(ElectricityMeter.ChannelId.ACTIVE_CONSUMPTION_ENERGY).setNextValue(0);
 			break;		
 		}
 	}
