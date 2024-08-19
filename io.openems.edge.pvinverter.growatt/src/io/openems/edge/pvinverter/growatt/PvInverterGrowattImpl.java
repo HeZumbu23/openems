@@ -75,17 +75,18 @@ public class PvInverterGrowattImpl extends AbstractOpenemsComponent implements P
                 .version(HttpClient.Version.HTTP_2)
                 .build();
         
+        this.api = new GrowattApi(this.client);
+        
         try {
-	        this.api = new GrowattApi(this.client);
-	        initialized = this.api.login(config.email(), config.password());
-	        if(initialized) {
-	        	log.debug("Sucessfully logged in into Growatt Cloud API");	        	 
-	        }
+	        this.api.login(config.email(), config.password());
+	        initialized = true;
         }
-		catch( IOException ex) {
-			this.channel(PvInverterGrowatt.ChannelId.GROWATT_API_FAILED).setNextValue(true);
-			this.logError(log,  "PvInverterGrowatt failen when logging in into Growatt Cloud API. Errormessage: " + ex.getMessage());
+		catch( GrowattApiException ex) {
+			initialized = false;
+			this.logError(log,  "PvInverterGrowatt failed when logging in into Growatt Cloud API. Errormessage: " + ex.getMessage());
 		}		
+        
+        this.channel(PvInverterGrowatt.ChannelId.GROWATT_API_FAILED).setNextValue(!initialized);
 	}
 
 	@Override
@@ -107,11 +108,18 @@ public class PvInverterGrowattImpl extends AbstractOpenemsComponent implements P
 			double power = -1;
 			try {
 				power = this.api.getPowerOfPlant(this.plantId);
+				this.channel(PvInverterGrowatt.ChannelId.GROWATT_API_FAILED).setNextValue(false);
 	        }
-			catch( Exception ex) {
+			catch(GrowattApiException ex) {
 				this.channel(PvInverterGrowatt.ChannelId.GROWATT_API_FAILED).setNextValue(true);
-				break;
+				this.log.error("Could not get power for plant " + plantId + " from Growatt API", ex);				
+				return;		
+			}
+			catch(Exception ex) {
+				this.channel(PvInverterGrowatt.ChannelId.GROWATT_API_FAILED).setNextValue(true);
+				throw ex;
 			}	
+			
 			int roundedPower = (int) Math.round(power);
 			this._setActivePower(roundedPower);
 			this.channel(ElectricityMeter.ChannelId.ACTIVE_PRODUCTION_ENERGY).setNextValue(roundedPower);

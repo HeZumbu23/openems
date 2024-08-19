@@ -55,51 +55,61 @@ public class GrowattApi {
         this.userAgent = userAgent != null ? userAgent : DEFAULT_USER_AGENT;
     }
 
-    public Boolean login(String username, String password) throws IOException, InterruptedException {
+    public void login(String username, String password) throws GrowattApiException {
         
-            // The specific endpoint for the login request
-            String endpoint = "newTwoLoginAPI.do";
+        // The specific endpoint for the login request
+        String endpoint = "newTwoLoginAPI.do";
 
-            // Encrypt the password using MD5
-            String encryptedPassword = hashPassword(password);
+        // Encrypt the password using MD5
+        String encryptedPassword = hashPassword(password);
 
-            // Construct the URL for the POST request
-            String url = baseUrl + "/" + endpoint;
+        // Construct the URL for the POST request
+        String url = baseUrl + "/" + endpoint;
+        
+        Map<Object, Object> data = new HashMap<>();
+        data.put("userName", username);
+        data.put("password", encryptedPassword);
+        
+        
+        
+        HttpRequest request = HttpRequest.newBuilder()
+                .header("Content-Type",  "application/x-www-form-urlencoded")
+                .header("User-Agent",  userAgent)
+                .uri(URI.create(url))
+                .POST(ofForm(data))
+                .build();
+        
+        
+        HttpResponse<String> response = null;
+        
+        try {
+        	response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        }
+        catch(InterruptedException ex)            
+        {
+        	throw new GrowattApiException("Could not login to Growatt API", ex);
+        }
+        catch(IOException ex)            
+        {
+        	throw new GrowattApiException("Could not login to Growatt API", ex);
+        }
+                    
+        var statusCode = response.statusCode();
+        
+        // Read the response
+        if (statusCode == HttpURLConnection.HTTP_OK) {
             
-            Map<Object, Object> data = new HashMap<>();
-            data.put("userName", username);
-            data.put("password", encryptedPassword);
-            
-            
-            
-            HttpRequest request = HttpRequest.newBuilder()
-                    .header("Content-Type",  "application/x-www-form-urlencoded")
-                    .header("User-Agent",  userAgent)
-                    .uri(URI.create(url))
-                    .POST(ofForm(data))
-                    .build();
-            
-            
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-            
-            var statusCode = response.statusCode();
-            
-            // Read the response
-            if (statusCode == HttpURLConnection.HTTP_OK) {
-                
-                // Parse the response JSON
-            	var jsonString = response.body();
-                JsonElement jsonElement = JsonParser.parseString(jsonString);
-                JsonObject jsonObject = jsonElement.getAsJsonObject();
-                JsonObject backObject = jsonObject.getAsJsonObject("back");
-                var success = backObject.get("success").getAsBoolean();
-                if( !success ) {
-                	var errormessage = backObject.get("error").getAsString();
-                	throw new IOException("Could not login into Growatt API. Error: " + errormessage);
-                }
-                return success;
-            } 
-            return false;       
+            // Parse the response JSON
+        	var jsonString = response.body();
+            JsonElement jsonElement = JsonParser.parseString(jsonString);
+            JsonObject jsonObject = jsonElement.getAsJsonObject();
+            JsonObject backObject = jsonObject.getAsJsonObject("back");
+            var success = backObject.get("success").getAsBoolean();
+            if( !success ) {
+            	var errormessage = backObject.get("error").getAsString();
+            	throw new GrowattApiException("Could not login to Growatt API. JSON response contains an error: " + errormessage);
+            }                
+        } 
     }
     
     private static HttpRequest.BodyPublisher ofForm(Map<Object, Object> data) {
@@ -124,7 +134,7 @@ public class GrowattApi {
         return URLEncoder.encode(obj.toString(), StandardCharsets.UTF_8);
     }
 
-    public JsonObject getPlantInfo(String plantId) {
+    public JsonObject getPlantInfo(String plantId) throws GrowattApiException {
         try {
             // The specific endpoint for the plant info request
         	String op = "getAllDeviceListTwo";
@@ -141,12 +151,12 @@ public class GrowattApi {
             // Send the GET request and return the response
             return sendGetRequest(url);
         } catch (Exception e) {
-            e.printStackTrace();
-            return null;
+            throw new GrowattApiException("Could not receive power of plant", e);
         }
     }
 
-    public double getPowerOfPlant(String plantId) {
+    
+    public double getPowerOfPlant(String plantId) throws GrowattApiException {
         try {
             // Retrieve plant information as JSON string
         	JsonObject plantInfoJson = getPlantInfo(plantId);
@@ -157,22 +167,16 @@ public class GrowattApi {
                 JsonObject device = deviceListElement.getAsJsonArray().get(0).getAsJsonObject();
                 return device.get("power").getAsDouble();
             } else {
-                System.out.println("Device list is empty or not an array");
-                return -1;
+                throw new GrowattApiException("Could not receive power of plant");
             }
         } catch (Exception e) {
-            e.printStackTrace();
-            return -1; // Return an error value in case of exception
+            throw new GrowattApiException("Could not receive power of plant", e);
         }
     }
 
     private JsonObject sendGetRequest(String url) {
         try {
-           
-         
-
-
-            HttpRequest req = HttpRequest.newBuilder()
+                   HttpRequest req = HttpRequest.newBuilder()
                     .uri(URI.create(url))
                     .header("Content-Type",  "application/json")
                     .header("User-Agent",  userAgent)
@@ -193,7 +197,7 @@ public class GrowattApi {
                 JsonObject jsonObject = jsonElement.getAsJsonObject();                
                 return jsonObject;
             } else {
-                System.out.println("GET request failed. Response Code: " + statusCode);
+            	 throw new GrowattApiException("HTTP Response Code: " + statusCode);
             }
         } catch (Exception e) {
             e.printStackTrace();            ;
