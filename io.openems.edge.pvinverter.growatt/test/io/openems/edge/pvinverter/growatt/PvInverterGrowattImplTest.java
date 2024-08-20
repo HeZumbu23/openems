@@ -20,7 +20,7 @@ public class PvInverterGrowattImplTest {
 						.setId(PV_INVERTER_ID) //
 						.setEmail("") //
 						.setPassword("") //
-						.setPlantId("") //						
+						.setPlantIndex(0) //						
 						.build()) //
 		;
 	}

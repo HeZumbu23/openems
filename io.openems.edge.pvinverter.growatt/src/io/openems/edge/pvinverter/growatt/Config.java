@@ -24,8 +24,8 @@ import org.osgi.service.metatype.annotations.ObjectClassDefinition;
 	@AttributeDefinition(name = "Growatt Cloud API Password", description = "Your password to log in into Growatt Cloud API", type = AttributeType.PASSWORD)
 	String password() default "";
 
-	@AttributeDefinition(name = "Growatt plant ID", description = "The plantId of your plant. You can find it when logging in into Growatt Cloud")
-	String plantId() default "";
+	@AttributeDefinition(name = "Growatt plant index", description = "If you have only one plant, keep this value empty. If you have multiple plants, specify the plant index (starting with 0) of the plant you want to use for this inverter instance.")
+	int plantIndex() default 0;
 
 	String webconsole_configurationFactory_nameHint() default "PV-Inverter Growatt [{id}]";
 

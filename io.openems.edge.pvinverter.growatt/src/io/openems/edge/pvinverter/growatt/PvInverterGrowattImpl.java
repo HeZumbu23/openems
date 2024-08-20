@@ -47,7 +47,7 @@ public class PvInverterGrowattImpl extends AbstractOpenemsComponent implements P
 		ElectricityMeter, OpenemsComponent, EventHandler {
 
 	private final Logger log = LoggerFactory.getLogger(PvInverterGrowattImpl.class);
-	private Config config;
+	
 	@Reference
 	private ConfigurationAdmin cm;
 	
@@ -65,9 +65,8 @@ public class PvInverterGrowattImpl extends AbstractOpenemsComponent implements P
 	@Activate
 	private void activate(ComponentContext context, Config config) throws OpenemsException, IOException, InterruptedException {
 		super.activate(context, config.id(), config.alias(), config.enabled());
-					
-		this.config = config;
-		this.api = new GrowattApi(config.email(), config.password());        
+							
+		this.api = new GrowattApi(config.email(), config.password(), config.plantIndex());        
 	}
 
 	@Override
@@ -88,18 +87,18 @@ public class PvInverterGrowattImpl extends AbstractOpenemsComponent implements P
 		
 			double power = -1;
 			try {
-				power = this.api.getPowerOfPlant(config.plantId());
+				power = this.api.getPowerOfPlant();
 				this.channel(PvInverterGrowatt.ChannelId.GROWATT_API_FAILED).setNextValue(false);
 	        }
 			catch(GrowattApiException ex) {
 				this.channel(PvInverterGrowatt.ChannelId.GROWATT_API_FAILED).setNextValue(true);
-				this.log.error("Could not get power for plant " + config.plantId() + " from Growatt API", ex);				
+				this.log.error("Could not get power of plant from Growatt API: " + ex.getMessage());				
 				return;		
 			}
 			catch(Exception ex) {
 				this.channel(PvInverterGrowatt.ChannelId.GROWATT_API_FAILED).setNextValue(true);
-				this.log.error("Unexpected exception when getting power for plant " + config.plantId() + " from Growatt API", ex);
-				throw ex;
+				this.log.error("Unexpected exception when getting power of plant from Growatt API: " + ex.getMessage());
+				return;
 			}	
 			
 			int roundedPower = (int) Math.round(power);

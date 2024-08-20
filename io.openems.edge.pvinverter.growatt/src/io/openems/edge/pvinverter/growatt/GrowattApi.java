@@ -36,21 +36,24 @@ public class GrowattApi {
 
     private final String email;
     private final String password;
+    private final int plantIndex;
     private ConnectionStatus status;
+    private String plantId;
         
-    public GrowattApi(String email, String password) {
+    public GrowattApi(String email, String password, int plantIndex) {
     	this.email = email;
     	this.password = password;
+    	this.plantIndex = plantIndex;
     	status = ConnectionStatus.NotLoggedIn;
     }
 
-    public double getPowerOfPlant(String plantId) throws GrowattApiException {
+    public double getPowerOfPlant() throws GrowattApiException {
     	if(status == ConnectionStatus.NotLoggedIn ) {
     		login();    	
     	} 
 
     	if(status == ConnectionStatus.LoggedIn) {
-    		return getPowerOfPlantInternal(plantId);   			
+    		return getPowerOfPlantInternal();   			
     	}
 
     	throw new GrowattApiException("Could not get power of plant");
@@ -59,7 +62,7 @@ public class GrowattApi {
     private void login() throws GrowattApiException {
         
         status = ConnectionStatus.NotLoggedIn;
-        
+                
         String url = GROWATT_API_BASEURL + "/newTwoLoginAPI.do";
 		String encryptedPassword = hashPassword(this.password);
         Map<Object, Object> postData = new HashMap<>();
@@ -75,25 +78,31 @@ public class GrowattApi {
         }
                     
         var statusCode = response.statusCode();
-        
-        
-        // Read the response
+              
         if (statusCode == HttpURLConnection.HTTP_OK) {
             
-            // Parse the response JSON
-        	JsonObject body = this.getJsonBody(response);
-            
+        	JsonObject body = this.getJsonBody(response);            
             JsonObject backObject = body.getAsJsonObject("back");
-            var success = backObject.get("success").getAsBoolean();
-            if( !success ) {
-            	var errormessage = backObject.get("error").getAsString();
-            	throw new GrowattApiException("Could not login to Growatt API. JSON response contains an error: " + errormessage);
-            }    
-//            var plants = backObject.get("data").getAsJsonArray();
-//            var firstPlant = plants.get(0);
-//            var first = firstPlant.getAsJsonObject()["plantId"];
+            
+            readSuccessProperty(backObject);    
+            this.readPlantId(backObject);
+
             status = ConnectionStatus.LoggedIn;
         } 
+    }
+    	
+    private double getPowerOfPlantInternal() throws GrowattApiException {
+    	// Retrieve plant information as JSON string
+    	JsonObject body = sendPlantInfoRequest();
+
+    	// Extract the power value from the deviceList array
+    	JsonElement deviceListElement = body.get("invList");
+    	if (deviceListElement != null && deviceListElement.isJsonArray()) {
+    		JsonObject device = deviceListElement.getAsJsonArray().get(0).getAsJsonObject();
+    		return device.get("power").getAsDouble();
+    	} 
+
+    	throw new GrowattApiException("Could not read 'power' property of 'invList'");
     }
 
 	private HttpResponse<String> sendPostRequest(String url, Map<Object,Object> postData) throws IOException, InterruptedException {
@@ -107,20 +116,28 @@ public class GrowattApi {
         
         return client.send(request, HttpResponse.BodyHandlers.ofString());        
 	}
-       
-    private double getPowerOfPlantInternal(String plantId) throws GrowattApiException {
-    	// Retrieve plant information as JSON string
-    	JsonObject body = getPlantInfo(plantId);
+	
+	private void readSuccessProperty(JsonObject backObject) throws GrowattApiException {
+		var success = backObject.get("success").getAsBoolean();
+		if( !success ) {
+			var errormessage = backObject.get("error").getAsString();
+			throw new GrowattApiException("Could not login to Growatt API. JSON response contains an error: " + errormessage);
+		}
+	}
 
-    	// Extract the power value from the deviceList array
-    	JsonElement deviceListElement = body.get("invList");
-    	if (deviceListElement != null && deviceListElement.isJsonArray()) {
-    		JsonObject device = deviceListElement.getAsJsonArray().get(0).getAsJsonObject();
-    		return device.get("power").getAsDouble();
-    	} 
-
-    	throw new GrowattApiException("Could not read 'power' property of 'invList'");
-    }
+	private void readPlantId(JsonObject backObject) throws GrowattApiException {
+		try {
+			var dataArray  = backObject.getAsJsonArray("data");
+			JsonObject plantObject = dataArray.get(this.plantIndex).getAsJsonObject();
+			this.plantId = plantObject.get("plantId").getAsString();
+		}
+		catch( IndexOutOfBoundsException ex) {
+			throw new GrowattApiException("Plant Index " + this.plantIndex + " seems to be not valid.", ex);
+		}
+		catch( NumberFormatException ex) {
+			throw new GrowattApiException("Could not parse plant for plant index " + this.plantIndex + ". Please try with plant index 0 in your configuration.", ex);
+		}
+	}
     
     private static HttpRequest.BodyPublisher ofForm(Map<Object, Object> data) {
 
@@ -144,7 +161,7 @@ public class GrowattApi {
         return URLEncoder.encode(obj.toString(), StandardCharsets.UTF_8);
     }
 
-    private JsonObject getPlantInfo(String plantId) throws GrowattApiException {
+    private JsonObject sendPlantInfoRequest() throws GrowattApiException {
         	String op = "getAllDeviceListTwo";
         	int pageNum = 1;
         	int pageSize = 1;
@@ -232,3 +249,4 @@ public class GrowattApi {
         }
     }
 }
+

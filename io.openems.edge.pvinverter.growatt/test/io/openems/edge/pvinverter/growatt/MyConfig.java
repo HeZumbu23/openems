@@ -10,7 +10,7 @@ public class MyConfig extends AbstractComponentConfig implements Config {
 		private String id = null;
 		private String email;
 		private String password;
-		private String plantId;
+		private int plantIndex;
 
 		private Builder() {
 		}
@@ -30,8 +30,8 @@ public class MyConfig extends AbstractComponentConfig implements Config {
 			return this;
 		}
 
-		public Builder setPlantId(String plantId) {
-			this.plantId = plantId;
+		public Builder setPlantIndex(int plantIndex) {
+			this.plantIndex = plantIndex;
 			return this;
 		}
 
@@ -67,8 +67,8 @@ public class MyConfig extends AbstractComponentConfig implements Config {
 	}
 
 	@Override
-	public String plantId() {
-		return this.builder.plantId;
+	public int plantIndex() {
+		return this.builder.plantIndex;
 	}
 
 
