@@ -33,7 +33,7 @@ steps:
     Dockerfile: 'tools/docker/ui/Dockerfile'
     buildContext: '.'
     # for arguments see https://github.com/HeZumbu23/openems/blob/develop/tools/docker/ui/README.md
-    arguments: 'VERSION=openems,openems-edge-docker'
+    arguments: '--build-arg VERSION=openems,openems-edge-docker'
 
   
 - task: Docker@2
