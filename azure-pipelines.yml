@@ -34,7 +34,9 @@ steps:
     buildContext: '.'
     # for arguments see https://github.com/HeZumbu23/openems/blob/develop/tools/docker/ui/README.md
     arguments: '--build-arg VERSION=openems,openems-edge-docker'
-
+    tags: |
+      $(Build.SourceBranchName)-$(Build.BuildId)
+      $(Build.SourceBranchName)-latest
   
 - task: Docker@2
   displayName: "Push OpenEMS UI"
@@ -42,6 +44,4 @@ steps:
     containerRegistry: 'Dockerhub'
     repository: 'mcmdoc120/openems-ui'
     command: 'push'
-    tags: |
-      $(Build.SourceBranchName)-$(Build.BuildId)
-      $(Build.SourceBranchName)-latest
+    
