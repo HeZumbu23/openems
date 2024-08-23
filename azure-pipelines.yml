@@ -25,13 +25,22 @@ steps:
       $(Build.SourceBranchName)-latest
 
 - task: Docker@2
-  displayName: "Build and publish OpenEMS UI"
-  inputs:    
+  displayName: "Build OpenEMS UI"
+  inputs:
     containerRegistry: 'Dockerhub'
     repository: 'mcmdoc120/openems-ui'
-    command: 'buildAndPush'
+    command: 'build'
     Dockerfile: 'tools/docker/ui/Dockerfile'
     buildContext: '.'
+    arguments: 'VERSION=openems,openems-edge-docker'
+
+  
+- task: Docker@2
+  displayName: "Push OpenEMS UI"
+  inputs:
+    containerRegistry: 'Dockerhub'
+    repository: 'mcmdoc120/openems-ui'
+    command: 'push'
     tags: |
       $(Build.SourceBranchName)-$(Build.BuildId)
       $(Build.SourceBranchName)-latest
