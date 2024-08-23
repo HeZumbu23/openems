@@ -44,4 +44,7 @@ steps:
     containerRegistry: 'Dockerhub'
     repository: 'mcmdoc120/openems-ui'
     command: 'push'
+    tags: |
+      $(Build.SourceBranchName)-$(Build.BuildId)
+      $(Build.SourceBranchName)-latest
     
